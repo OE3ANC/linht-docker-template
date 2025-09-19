@@ -12,6 +12,12 @@ jobs:
         env:
             OWNER: '${{ github.repository_owner }}'
 
+      - name: set lower case owner name
+        run: |
+            echo "REPO_LC=${REPO,,}" >>${GITHUB_ENV}
+        env:
+            REPO: '${{ github.repository }}'
+
       - name: Checkout
         uses: actions/checkout@v3
 
@@ -34,17 +40,17 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ env.OWNER_LC }}/${{ github.repository }}:${{ github.ref_name }}
+            ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}
 
       - name: Docker save x64
         run: |
-          docker pull ghcr.io/${{ env.OWNER_LC }}/${{ github.repository }}:${{ github.ref_name }} --platform=linux/amd64
-          docker save ghcr.io/${{ env.OWNER_LC }}/${{ github.repository }}:${{ github.ref_name }} -o image-x64.tar
+          docker pull ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} --platform=linux/amd64
+          docker save ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} -o image-x64.tar
 
       - name: Docker save arm64
         run: |
-          docker pull ghcr.io/${{ env.OWNER_LC }}/${{ github.repository }}:${{ github.ref_name }} --platform=linux/arm64
-          docker save ghcr.io/${{ env.OWNER_LC }}/${{ github.repository }}:${{ github.ref_name }} -o image-arm64.tar
+          docker pull ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} --platform=linux/arm64
+          docker save ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} -o image-arm64.tar
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v1
