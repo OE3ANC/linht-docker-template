@@ -12,7 +12,6 @@ on:
 # Global environment variables
 env:
   REGISTRY: ghcr.io                    # GitHub Container Registry
-  IMAGE_NAME: ${{ github.repository }} # Uses format: owner/repo-name
 
 jobs:
   # Build and push Docker images for multiple architectures
@@ -36,6 +35,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Extract and normalize repository metadata
+      - name: Extract metadata
+        id: meta
+        run: |
+          # Convert repository name to lowercase for Docker registry compatibility
+          echo "image-name=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
       # Set up Docker Buildx for advanced build features and caching
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -55,7 +62,7 @@ jobs:
           context: .                                    # Build from repository root
           platforms: ${{ matrix.platform }}            # Target specific architecture
           push: true                                    # Push to registry immediately
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/${{ steps.meta.outputs.image-name }}:${{ steps.meta.outputs.tag }}-${{ matrix.arch }}
           # GitHub Actions cache for faster subsequent builds
           cache-from: type=gha,scope=linht-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=linht-${{ matrix.arch }}
@@ -64,9 +71,9 @@ jobs:
       - name: Export LinHT ${{ matrix.arch }} image
         run: |
           # Pull the image we just pushed
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ matrix.arch }}
+          docker pull ${{ env.REGISTRY }}/${{ steps.meta.outputs.image-name }}:${{ steps.meta.outputs.tag }}-${{ matrix.arch }}
           # Save it as a tar file for offline distribution
-          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ matrix.arch }} -o linht-${{ matrix.arch }}.tar
+          docker save ${{ env.REGISTRY }}/${{ steps.meta.outputs.image-name }}:${{ steps.meta.outputs.tag }}-${{ matrix.arch }} -o linht-${{ matrix.arch }}.tar
 
       # Upload the tar file as a workflow artifact (temporary storage)
       - name: Upload LinHT ${{ matrix.arch }} artifact
@@ -95,4 +102,3 @@ jobs:
           files: |
             ./artifacts/linht-docker-amd64/linht-amd64.tar
             ./artifacts/linht-docker-arm64/linht-arm64.tar
-
