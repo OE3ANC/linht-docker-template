@@ -1,4 +1,4 @@
-name: Build & Release Docker Images
+name: Build & Release LinHT Docker Images
 on:
   push:
     branches:
@@ -6,24 +6,26 @@ on:
   release:
     types: [published]
 
+env:
+  REGISTRY: ghcr.io
+
 jobs:
   build-and-push-x64:
     runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
     steps:
-      - name: set lower case owner name
-        run: |
-            echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
-        env:
-            OWNER: '${{ github.repository_owner }}'
-
-      - name: set lower case repo name
-        run: |
-            echo "REPO_LC=${REPO,,}" >>${GITHUB_ENV}
-        env:
-            REPO: '${{ github.repository }}'
-
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          OWNER_LC="${{ github.repository_owner }}"
+          REPO_LC="${{ github.repository }}"
+          echo "owner=${OWNER_LC,,}" >> $GITHUB_OUTPUT
+          echo "repo=${REPO_LC,,}" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -31,48 +33,48 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push x64 image
+      - name: Build and push LinHT x64 image
         uses: docker/build-push-action@v6
         with:
+          context: .
           platforms: linux/amd64
           push: true
-          tags: |
-            ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}-amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-amd64
+          cache-from: type=gha,scope=linht-amd64
+          cache-to: type=gha,mode=max,scope=linht-amd64
 
-      - name: Docker save x64
+      - name: Export LinHT x64 image
         run: |
-          docker pull ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}-amd64
-          docker save ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}-amd64 -o image-x64.tar
+          docker pull ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-amd64
+          docker save ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-amd64 -o linht-x64.tar
 
-      - name: Upload x64 artifact
+      - name: Upload LinHT x64 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: docker-x64
-          path: image-x64.tar
+          name: linht-docker-x64
+          path: linht-x64.tar
+          retention-days: 1
 
   build-and-push-arm64:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04-arm64
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
     steps:
-      - name: set lower case owner name
-        run: |
-            echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
-        env:
-            OWNER: '${{ github.repository_owner }}'
-
-      - name: set lower case repo name
-        run: |
-            echo "REPO_LC=${REPO,,}" >>${GITHUB_ENV}
-        env:
-            REPO: '${{ github.repository }}'
-
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          OWNER_LC="${{ github.repository_owner }}"
+          REPO_LC="${{ github.repository }}"
+          echo "owner=${OWNER_LC,,}" >> $GITHUB_OUTPUT
+          echo "repo=${REPO_LC,,}" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -80,71 +82,67 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push arm64 image
+      - name: Build and push LinHT arm64 image
         uses: docker/build-push-action@v6
         with:
+          context: .
           platforms: linux/arm64
           push: true
-          tags: |
-            ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}-arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-arm64
+          cache-from: type=gha,scope=linht-arm64
+          cache-to: type=gha,mode=max,scope=linht-arm64
 
-      - name: Docker save arm64
+      - name: Export LinHT arm64 image
         run: |
-          docker pull ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}-arm64
-          docker save ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}-arm64 -o image-arm64.tar
+          docker pull ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-arm64
+          docker save ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-arm64 -o linht-arm64.tar
 
-      - name: Upload arm64 artifact
+      - name: Upload LinHT arm64 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: docker-arm64
-          path: image-arm64.tar
+          name: linht-docker-arm64
+          path: linht-arm64.tar
+          retention-days: 1
 
   create-manifest-and-release:
     needs: [build-and-push-x64, build-and-push-arm64]
     runs-on: ubuntu-latest
     steps:
-      - name: set lower case owner name
+      - name: Extract metadata
+        id: meta
         run: |
-            echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
-        env:
-            OWNER: '${{ github.repository_owner }}'
-
-      - name: set lower case repo name
-        run: |
-            echo "REPO_LC=${REPO,,}" >>${GITHUB_ENV}
-        env:
-            REPO: '${{ github.repository }}'
+          OWNER_LC="${{ github.repository_owner }}"
+          REPO_LC="${{ github.repository }}"
+          echo "owner=${OWNER_LC,,}" >> $GITHUB_OUTPUT
+          echo "repo=${REPO_LC,,}" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create and push multi-arch manifest
+      - name: Create and push LinHT multi-arch manifest
         run: |
-          docker manifest create ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} \
-            ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}-amd64 \
-            ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}-arm64
-          docker manifest push ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}
+          docker manifest create ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }} \
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-amd64 \
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-arm64
+          docker manifest push ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}
 
-      - name: Download artifacts
+      - name: Download LinHT artifacts
         if: github.event_name == 'release'
         uses: actions/download-artifact@v4
 
-      - name: Upload release assets
+      - name: Upload LinHT release assets
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            docker-x64/image-x64.tar
-            docker-arm64/image-arm64.tar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            linht-docker-x64/linht-x64.tar
+            linht-docker-arm64/linht-arm64.tar
