@@ -89,16 +89,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Download all artifacts created by the build jobs
-      - name: Download artifacts
+      # Download only the specific artifacts we need (not the Docker buildx cache artifacts)
+      - name: Download LinHT AMD64 artifact
         uses: actions/download-artifact@v4
         with:
-          path: ./artifacts/                            # Download all artifacts to this directory
+          name: linht-docker-amd64
+          path: ./artifacts/
+
+      - name: Download LinHT ARM64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linht-docker-arm64
+          path: ./artifacts/
 
       # Attach the Docker image tar files to the GitHub release
       - name: Upload LinHT release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ./artifacts/linht-docker-amd64/linht-amd64.tar
-            ./artifacts/linht-docker-arm64/linht-arm64.tar
+            ./artifacts/linht-amd64.tar
+            ./artifacts/linht-arm64.tar
