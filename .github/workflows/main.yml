@@ -1,30 +1,46 @@
+# LinHT Docker Image Build & Release Template
+# This workflow builds multi-architecture Docker images and attaches them to GitHub releases
+# Supports both x64 (amd64) and ARM64 architectures with native ARM runners for optimal performance
+
 name: Build & Release LinHT Docker Images
+
+# Trigger only on published releases to avoid unnecessary builds
 on:
   release:
     types: [published]
 
+# Global environment variables
 env:
-  REGISTRY: ghcr.io
+  REGISTRY: ghcr.io                    # GitHub Container Registry
+  IMAGE_NAME: ${{ github.repository }} # Uses format: owner/repo-name
 
 jobs:
-  build-and-push-x64:
-    runs-on: ubuntu-latest
+  # Build and push Docker images for multiple architectures
+  build-and-push:
+    strategy:
+      matrix:
+        include:
+          # x64/AMD64 build on standard Ubuntu runner
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+          # ARM64 build on native ARM runner for faster compilation
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm  # Note: use 'arm' not 'arm64' for runner label
+            arch: arm64
+
+    runs-on: ${{ matrix.runner }}
+
     steps:
+      # Check out the repository code
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract metadata
-        id: meta
-        run: |
-          OWNER_LC="${{ github.repository_owner }}"
-          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-          echo "owner=${OWNER_LC,,}" >> $GITHUB_OUTPUT
-          echo "repo=${REPO_NAME,,}" >> $GITHUB_OUTPUT
-          echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
-
+      # Set up Docker Buildx for advanced build features and caching
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Authenticate with GitHub Container Registry
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -32,95 +48,51 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push LinHT x64 image
+      # Build and push the Docker image for current architecture
+      - name: Build and push LinHT ${{ matrix.arch }} image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-amd64
-          cache-from: type=gha,scope=linht-amd64
-          cache-to: type=gha,mode=max,scope=linht-amd64
+          context: .                                    # Build from repository root
+          platforms: ${{ matrix.platform }}            # Target specific architecture
+          push: true                                    # Push to registry immediately
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ matrix.arch }}
+          # GitHub Actions cache for faster subsequent builds
+          cache-from: type=gha,scope=linht-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=linht-${{ matrix.arch }}
 
-      - name: Export LinHT x64 image
+      # Export the built image as a tar file for release attachment
+      - name: Export LinHT ${{ matrix.arch }} image
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-amd64
-          docker save ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-amd64 -o linht-x64.tar
+          # Pull the image we just pushed
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ matrix.arch }}
+          # Save it as a tar file for offline distribution
+          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ matrix.arch }} -o linht-${{ matrix.arch }}.tar
 
-      - name: Upload LinHT x64 artifact
+      # Upload the tar file as a workflow artifact (temporary storage)
+      - name: Upload LinHT ${{ matrix.arch }} artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linht-docker-x64
-          path: linht-x64.tar
-          retention-days: 1
+          name: linht-docker-${{ matrix.arch }}         # Unique name per architecture
+          path: linht-${{ matrix.arch }}.tar            # The exported tar file
+          retention-days: 1                             # Keep for 1 day only (just for release)
 
-  build-and-push-arm64:
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Extract metadata
-        id: meta
-        run: |
-          OWNER_LC="${{ github.repository_owner }}"
-          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-          echo "owner=${OWNER_LC,,}" >> $GITHUB_OUTPUT
-          echo "repo=${REPO_NAME,,}" >> $GITHUB_OUTPUT
-          echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push LinHT arm64 image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/arm64
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-arm64
-          cache-from: type=gha,scope=linht-arm64
-          cache-to: type=gha,mode=max,scope=linht-arm64
-
-      - name: Export LinHT arm64 image
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-arm64
-          docker save ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-arm64 -o linht-arm64.tar
-
-      - name: Upload LinHT arm64 artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linht-docker-arm64
-          path: linht-arm64.tar
-          retention-days: 1
-
+  # Attach the Docker image tar files to the GitHub release
   upload-release-assets:
-    needs: [build-and-push-x64, build-and-push-arm64]
+    needs: build-and-push                               # Wait for all builds to complete
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+
     steps:
-      - name: Download LinHT x64 artifact
+      # Download all artifacts created by the build jobs
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: linht-docker-x64
-          path: ./artifacts/
+          path: ./artifacts/                            # Download all artifacts to this directory
 
-      - name: Download LinHT arm64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: linht-docker-arm64
-          path: ./artifacts/
-
+      # Attach the Docker image tar files to the GitHub release
       - name: Upload LinHT release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ./artifacts/linht-x64.tar
-            ./artifacts/linht-arm64.tar
+            ./artifacts/linht-docker-amd64/linht-amd64.tar
+            ./artifacts/linht-docker-arm64/linht-arm64.tar
+
