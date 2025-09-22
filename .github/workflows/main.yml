@@ -1,8 +1,5 @@
 name: Build & Release LinHT Docker Images
 on:
-  push:
-    branches:
-      - main
   release:
     types: [published]
 
