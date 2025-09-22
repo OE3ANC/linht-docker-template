@@ -12,8 +12,6 @@ env:
 jobs:
   build-and-push-x64:
     runs-on: ubuntu-latest
-    outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,8 +59,6 @@ jobs:
 
   build-and-push-arm64:
     runs-on: ubuntu-24.04-arm
-    outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,7 +71,6 @@ jobs:
           echo "owner=${OWNER_LC,,}" >> $GITHUB_OUTPUT
           echo "repo=${REPO_NAME,,}" >> $GITHUB_OUTPUT
           echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
-
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -109,39 +104,15 @@ jobs:
           path: linht-arm64.tar
           retention-days: 1
 
-  create-manifest-and-release:
+  upload-release-assets:
     needs: [build-and-push-x64, build-and-push-arm64]
     runs-on: ubuntu-latest
+    if: github.event_name == 'release'
     steps:
-      - name: Extract metadata
-        id: meta
-        run: |
-          OWNER_LC="${{ github.repository_owner }}"
-          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-          echo "owner=${OWNER_LC,,}" >> $GITHUB_OUTPUT
-          echo "repo=${REPO_NAME,,}" >> $GITHUB_OUTPUT
-          echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create and push LinHT multi-arch manifest
-        run: |
-          docker manifest create ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }} \
-            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-amd64 \
-            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}-arm64
-          docker manifest push ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}
-
       - name: Download LinHT artifacts
-        if: github.event_name == 'release'
         uses: actions/download-artifact@v4
 
       - name: Upload LinHT release assets
-        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: |
