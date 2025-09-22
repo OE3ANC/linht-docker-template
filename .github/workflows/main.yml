@@ -1,8 +1,5 @@
 name: Build & Release Docker Images
 on:
-  push:
-    branches:
-      - main
   release:
     types: [published]
 
@@ -16,7 +13,7 @@ jobs:
         env:
             OWNER: '${{ github.repository_owner }}'
 
-      - name: set lower case owner name
+      - name: set lower case repo name
         run: |
             echo "REPO_LC=${REPO,,}" >>${GITHUB_ENV}
         env:
@@ -46,19 +43,22 @@ jobs:
           tags: |
             ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }}
 
-      - name: Docker save x64
+      - name: Docker save x64 # Just for testing, remove later
         run: |
           docker pull ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} --platform=linux/amd64
-          docker save ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} -o image-x64.tar
+          docker save ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} -o linht-image-x64.tar
 
       - name: Docker save arm64
         run: |
           docker pull ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} --platform=linux/arm64
-          docker save ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} -o image-arm64.tar
+          docker save ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}:${{ github.ref_name }} -o linht-image-arm64.tar
 
       - name: Upload release assets
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            image-x64.tar
-            image-arm64.tar
+            linht-image-x64.tar
+            linht-image-arm64.tar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
