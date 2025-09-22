@@ -106,12 +106,21 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     steps:
-      - name: Download LinHT artifacts
+      - name: Download LinHT x64 artifact
         uses: actions/download-artifact@v4
+        with:
+          name: linht-docker-x64
+          path: ./artifacts/
+
+      - name: Download LinHT arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linht-docker-arm64
+          path: ./artifacts/
 
       - name: Upload LinHT release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            linht-docker-x64/linht-x64.tar
-            linht-docker-arm64/linht-arm64.tar
+            ./artifacts/linht-x64.tar
+            ./artifacts/linht-arm64.tar
