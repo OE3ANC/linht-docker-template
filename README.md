@@ -28,6 +28,14 @@ Click the **"Use this template"** button above to create a new repository with t
 1. Copy `.github/workflows/docker-build.yml` to your existing project
 2. Follow the [Customization](#customization) steps below
 
+## Setup Package Permissions
+To push Docker images to GitHub Container Registry, you need to enable package creation:
+
+### Repository Workflow Permissions:
+1. In your repository, go to **Settings** → **Actions** → **General**
+2. Under **Workflow permissions**, select **"Read and write permissions"**
+
+
 ## Workflow Overview
 
 The workflow consists of two main jobs:
