@@ -31,6 +31,23 @@ jobs:
     runs-on: ${{ matrix.runner }}
 
     steps:
+      # Free up space in the ubuntu image - otherwise the arm64 runner runs out of memory soon!
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: false
+          
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+          
       # Check out the repository code
       - name: Checkout
         uses: actions/checkout@v4
